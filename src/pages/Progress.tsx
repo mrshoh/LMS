@@ -2,18 +2,21 @@ import { motion } from 'framer-motion';
 import { TrendingUp, Flame, Trophy, Target, BookOpen, Clock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Progress as ProgressBar } from '@/components/ui/progress';
-import { storage } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 const Progress = () => {
   const { user } = useAuth();
-  const courses = storage.getCourses();
-  const weeklyProgress = storage.getProgress();
+  const courses = useLiveQuery(() => db.courses.toArray());
+  const weeklyProgress = useLiveQuery(() => db.weeklyProgress.toArray());
+
+  if (!courses || !weeklyProgress) return null;
 
   const totalLessonsCompleted = weeklyProgress.reduce((acc, p) => acc + p.lessonsCompleted, 0);
   const totalHoursStudied = weeklyProgress.reduce((acc, p) => acc + p.hoursStudied, 0);
-  const maxLessons = Math.max(...weeklyProgress.map(p => p.lessonsCompleted));
+  const maxLessons = Math.max(...weeklyProgress.map(p => p.lessonsCompleted), 1);
 
   const overallProgress = Math.round(
     courses.reduce((acc, c) => acc + c.progress, 0) / courses.length
@@ -145,11 +148,11 @@ const Progress = () => {
                   <div
                     className={cn(
                       "w-full rounded-t-lg transition-all",
-                      day.lessonsCompleted === maxLessons 
-                        ? "gradient-primary" 
+                      day.lessonsCompleted === maxLessons
+                        ? "gradient-primary"
                         : "bg-primary/30"
                     )}
-                    style={{ 
+                    style={{
                       height: `${(day.lessonsCompleted / maxLessons) * 100}px`,
                       minHeight: day.lessonsCompleted > 0 ? '20px' : '4px'
                     }}
@@ -187,12 +190,13 @@ const Progress = () => {
                     course.category === 'backend' && "text-backend",
                     course.category === 'design' && "text-design",
                     course.category === 'data' && "text-data",
+                    course.category === 'mobile' && "text-primary",
                   )}>
                     {course.progress}%
                   </span>
                 </div>
-                <ProgressBar 
-                  value={course.progress} 
+                <ProgressBar
+                  value={course.progress}
                   variant={course.category}
                   className="h-2"
                 />

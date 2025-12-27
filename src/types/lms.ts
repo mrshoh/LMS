@@ -11,7 +11,7 @@ export interface Course {
   id: string;
   title: string;
   description: string;
-  category: 'frontend' | 'backend' | 'design' | 'data';
+  category: 'frontend' | 'backend' | 'design' | 'data' | 'mobile';
   progress: number;
   totalLessons: number;
   completedLessons: number;

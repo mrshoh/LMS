@@ -1,13 +1,16 @@
 import { motion } from 'framer-motion';
 import { BookCheck, Clock, Trophy, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { storage } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 export const QuickStats = () => {
   const { user } = useAuth();
-  const courses = storage.getCourses();
-  const progress = storage.getProgress();
+  const courses = useLiveQuery(() => db.courses.toArray());
+  const progress = useLiveQuery(() => db.weeklyProgress.toArray());
+
+  if (!courses || !progress) return null;
 
   const totalLessons = courses.reduce((acc, c) => acc + c.completedLessons, 0);
   const totalHours = progress.reduce((acc, p) => acc + p.hoursStudied, 0);

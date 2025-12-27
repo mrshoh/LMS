@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Play, 
+import {
+  ArrowLeft,
+  Play,
   Pause,
-  CheckCircle2, 
-  Circle, 
-  Clock, 
+  CheckCircle2,
+  Circle,
+  Clock,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -34,19 +34,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { storage } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 const Lesson = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const lessons = storage.getLessons();
-  const courses = storage.getCourses();
-  const lesson = lessons.find(l => l.id === id);
-  
+
+  const lessons = useLiveQuery(() => db.lessons.toArray()) || [];
+  const courses = useLiveQuery(() => db.courses.toArray()) || [];
+  const lesson = useLiveQuery(() => db.lessons.get(id || '')) || null;
+  const savedNote = useLiveQuery(() => db.notes.get(id || ''));
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [notes, setNotes] = useState('');
   const [videoProgress, setVideoProgress] = useState(0);
   const [activeTab, setActiveTab] = useState('tasks');
+
+  useEffect(() => {
+    if (savedNote) {
+      setNotes(savedNote.content);
+    }
+  }, [savedNote]);
 
   // Simulate video progress
   useEffect(() => {
@@ -76,26 +86,31 @@ const Lesson = () => {
   const completedTasks = lesson.tasks.filter(t => t.completed).length;
   const progressPercent = (completedTasks / lesson.tasks.length) * 100;
 
-  // Find previous and next lessons
-  const currentIndex = lessons.findIndex(l => l.id === id);
-  const prevLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null;
-  const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null;
+  const courseLessons = lessons.filter(l => l.courseId === lesson.courseId).sort((a, b) => a.order - b.order);
+  const currentIndex = courseLessons.findIndex(l => l.id === id);
+  const prevLesson = currentIndex > 0 ? courseLessons[currentIndex - 1] : null;
+  const nextLesson = currentIndex < courseLessons.length - 1 ? courseLessons[currentIndex + 1] : null;
 
-  const toggleTask = (taskId: string) => {
-    const updatedLessons = lessons.map(l => {
-      if (l.id === lesson.id) {
-        return {
-          ...l,
-          tasks: l.tasks.map(t => 
-            t.id === taskId ? { ...t, completed: !t.completed } : t
-          ),
-        };
-      }
-      return l;
-    });
-    storage.setLessons(updatedLessons);
+  const toggleTask = async (taskId: string) => {
+    if (!lesson) return;
+
+    const updatedTasks = lesson.tasks.map(t =>
+      t.id === taskId ? { ...t, completed: !t.completed } : t
+    );
+
+    await db.lessons.update(lesson.id, { tasks: updatedTasks });
+
+    // Update overall course progress
+    const courseLessons = lessons.filter(l => l.courseId === lesson.courseId);
+    const totalTasks = courseLessons.reduce((acc, l) => acc + l.tasks.length, 0);
+    const completedTasksAcrossCourse = courseLessons.reduce((acc, l) =>
+      acc + (l.id === lesson.id ? updatedTasks : l.tasks).filter(t => t.completed).length, 0
+    );
+
+    const newProgress = Math.round((completedTasksAcrossCourse / totalTasks) * 100);
+    await db.courses.update(lesson.courseId, { progress: newProgress });
+
     toast.success('Task updated!');
-    navigate(`/lesson/${id}`, { replace: true });
   };
 
   const resources = [
@@ -122,7 +137,7 @@ const Lesson = () => {
           <span className="text-muted-foreground">/</span>
           <span className="font-medium text-foreground">Lesson {lesson.order}</span>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -161,98 +176,109 @@ const Lesson = () => {
             <Card className="overflow-hidden border-0 shadow-xl">
               {/* Video Area */}
               <div className="relative aspect-video bg-gradient-to-br from-foreground/5 via-primary/10 to-backend/10 overflow-hidden group">
-                {/* Animated Background Pattern */}
-                <div className="absolute inset-0">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(14,165,233,0.15),transparent_50%)]" />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_70%,rgba(139,92,246,0.15),transparent_50%)]" />
-                  <motion.div 
-                    className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')]"
-                    animate={{ opacity: [0.3, 0.5, 0.3] }}
-                    transition={{ duration: 4, repeat: Infinity }}
+                {lesson?.videoUrl ? (
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src={lesson.videoUrl}
+                    title={lesson.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
                   />
-                </div>
-
-                {/* Play Button */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={cn(
-                      "relative z-10 flex h-24 w-24 items-center justify-center rounded-full shadow-2xl transition-all",
-                      isPlaying 
-                        ? "bg-foreground/90 text-background" 
-                        : "gradient-primary text-primary-foreground shadow-glow"
-                    )}
-                    onClick={() => setIsPlaying(!isPlaying)}
-                  >
-                    <AnimatePresence mode="wait">
-                      {isPlaying ? (
-                        <motion.div
-                          key="pause"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                        >
-                          <Pause className="h-10 w-10" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="play"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                        >
-                          <Play className="h-10 w-10 ml-1" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-                </div>
-
-                {/* Video Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 via-foreground/40 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {/* Progress Bar */}
-                  <div className="mb-3">
-                    <div className="h-1 bg-primary-foreground/30 rounded-full overflow-hidden">
-                      <motion.div 
-                        className="h-full gradient-primary"
-                        style={{ width: `${videoProgress}%` }}
+                ) : (
+                  <>
+                    {/* Animated Background Pattern */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(14,165,233,0.15),transparent_50%)]" />
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_70%,rgba(139,92,246,0.15),transparent_50%)]" />
+                      <motion.div
+                        className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZ24+PC9zdmc+')]"
+                        animate={{ opacity: [0.3, 0.5, 0.3] }}
+                        transition={{ duration: 4, repeat: Infinity }}
                       />
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-primary-foreground">
-                    <div className="flex items-center gap-3">
-                      <button className="hover:text-primary transition-colors">
-                        <SkipBack className="h-5 w-5" />
-                      </button>
-                      <button 
-                        className="hover:text-primary transition-colors"
+
+                    {/* Play Button */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={cn(
+                          "relative z-10 flex h-24 w-24 items-center justify-center rounded-full shadow-2xl transition-all",
+                          isPlaying
+                            ? "bg-foreground/90 text-background"
+                            : "gradient-primary text-primary-foreground shadow-glow"
+                        )}
                         onClick={() => setIsPlaying(!isPlaying)}
                       >
-                        {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-                      </button>
-                      <button className="hover:text-primary transition-colors">
-                        <SkipForward className="h-5 w-5" />
-                      </button>
-                      <span className="text-sm ml-2">
-                        {Math.floor(videoProgress * 0.45)}:{String(Math.floor((videoProgress * 0.45 % 1) * 60)).padStart(2, '0')} / {lesson.duration}
-                      </span>
+                        <AnimatePresence mode="wait">
+                          {isPlaying ? (
+                            <motion.div
+                              key="pause"
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                            >
+                              <Pause className="h-10 w-10" />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="play"
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                            >
+                              <Play className="h-10 w-10 ml-1" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.button>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button className="hover:text-primary transition-colors">
-                        <Volume2 className="h-5 w-5" />
-                      </button>
-                      <button className="hover:text-primary transition-colors">
-                        <Maximize2 className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
+                    {/* Video Controls Overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 via-foreground/40 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Progress Bar */}
+                      <div className="mb-3">
+                        <div className="h-1 bg-primary-foreground/30 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full gradient-primary"
+                            style={{ width: `${videoProgress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-primary-foreground">
+                        <div className="flex items-center gap-3">
+                          <button className="hover:text-primary transition-colors">
+                            <SkipBack className="h-5 w-5" />
+                          </button>
+                          <button
+                            className="hover:text-primary transition-colors"
+                            onClick={() => setIsPlaying(!isPlaying)}
+                          >
+                            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                          </button>
+                          <button className="hover:text-primary transition-colors">
+                            <SkipForward className="h-5 w-5" />
+                          </button>
+                          <span className="text-sm ml-2">
+                            {Math.floor(videoProgress * 0.45)}:{String(Math.floor((videoProgress * 0.45 % 1) * 60)).padStart(2, '0')} / {lesson.duration}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button className="hover:text-primary transition-colors">
+                            <Volume2 className="h-5 w-5" />
+                          </button>
+                          <button className="hover:text-primary transition-colors">
+                            <Maximize2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
                 {/* Playing indicator */}
                 {isPlaying && (
-                  <motion.div 
+                  <motion.div
                     className="absolute top-4 left-4 flex items-center gap-2 rounded-full bg-destructive px-3 py-1.5"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -279,12 +305,12 @@ const Lesson = () => {
                     </>
                   )}
                 </div>
-                
+
                 <h1 className="text-2xl lg:text-3xl font-bold text-foreground">{lesson.title}</h1>
                 <p className="mt-3 text-muted-foreground leading-relaxed">{lesson.description}</p>
 
                 {/* XP Badge */}
-                <motion.div 
+                <motion.div
                   className="mt-4 inline-flex items-center gap-2 rounded-full bg-warning/10 px-4 py-2"
                   whileHover={{ scale: 1.05 }}
                 >
@@ -377,8 +403,8 @@ const Lesson = () => {
                         transition={{ delay: 0.4 + index * 0.05 }}
                         className={cn(
                           "flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer group",
-                          task.completed 
-                            ? "bg-success/5 border-success/20" 
+                          task.completed
+                            ? "bg-success/5 border-success/20"
                             : "bg-secondary/30 border-border/50 hover:border-primary/30 hover:bg-secondary/50"
                         )}
                         onClick={() => toggleTask(task.id)}
@@ -434,13 +460,16 @@ const Lesson = () => {
                     onChange={(e) => setNotes(e.target.value)}
                     className="min-h-[300px] resize-none"
                   />
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-3 w-full"
-                    onClick={() => {
-                      localStorage.setItem(`lesson_notes_${id}`, notes);
-                      toast.success('Notes saved!');
+                  <Button
+                    className="w-full gradient-primary"
+                    onClick={async () => {
+                      if (!id) return;
+                      await db.notes.put({
+                        lessonId: id,
+                        content: notes,
+                        lastUpdated: new Date().toISOString()
+                      });
+                      toast.success('Notes saved to database!');
                     }}
                   >
                     Save Notes
@@ -490,10 +519,19 @@ const Lesson = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Complete all tasks and watch the video to mark this lesson as done.
               </p>
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 size="lg"
-                onClick={() => {
+                onClick={async () => {
+                  if (!lesson) return;
+                  await db.lessons.update(lesson.id, { completed: true });
+
+                  const course = await db.courses.get(lesson.courseId);
+                  if (course) {
+                    const completedInCourse = (await db.lessons.where('courseId').equals(lesson.courseId).and(l => l.completed).toArray()).length;
+                    await db.courses.update(lesson.courseId, { completedLessons: completedInCourse });
+                  }
+
                   toast.success('Lesson completed! +50 XP');
                   navigate('/dashboard');
                 }}
@@ -501,8 +539,8 @@ const Lesson = () => {
                 <CheckCircle2 className="h-4 w-4" />
                 Complete Lesson
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="w-full mt-2"
                 onClick={() => navigate('/assignments')}
               >

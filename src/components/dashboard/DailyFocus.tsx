@@ -3,15 +3,18 @@ import { Clock, BookOpen, MessageCircle, ChevronRight, Flame } from 'lucide-reac
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { storage } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 export const DailyFocus = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const lessons = storage.getLessons();
-  const assignments = storage.getAssignments();
-  const messages = storage.getMessages();
+  const lessons = useLiveQuery(() => db.lessons.toArray());
+  const assignments = useLiveQuery(() => db.assignments.toArray());
+  const messages = useLiveQuery(() => db.messages.toArray());
+
+  if (!lessons || !assignments || !messages) return null;
 
   const todayLesson = lessons.find(l => !l.completed);
   const pendingAssignment = assignments.find(a => a.status === 'pending');
@@ -107,8 +110,8 @@ export const DailyFocus = () => {
 
         {/* CTA */}
         <div className="p-4 bg-secondary/30">
-          <Button 
-            className="w-full" 
+          <Button
+            className="w-full"
             size="lg"
             onClick={() => todayLesson && navigate(`/lesson/${todayLesson.id}`)}
           >

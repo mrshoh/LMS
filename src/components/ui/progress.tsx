@@ -14,6 +14,7 @@ const progressVariants = cva(
         backend: "bg-backend",
         design: "bg-design",
         data: "bg-data",
+        mobile: "bg-primary",
         success: "gradient-success",
         accent: "gradient-accent",
       },
@@ -26,7 +27,7 @@ const progressVariants = cva(
 
 interface ProgressProps
   extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>,
-    VariantProps<typeof progressVariants> {}
+  VariantProps<typeof progressVariants> { }
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,

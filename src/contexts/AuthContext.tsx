@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types/lms';
 import { storage } from '@/lib/storage';
+import { initializeDatabase } from '@/lib/db';
 
 interface AuthContextType {
   user: User | null;
@@ -17,19 +18,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    storage.initializeData();
-    if (storage.isLoggedIn()) {
-      setUser(storage.getUser());
-      setIsAuthenticated(true);
-    }
+    const init = async () => {
+      await initializeDatabase();
+      if (storage.isLoggedIn()) {
+        const userData = await storage.getUser();
+        setUser(userData);
+        setIsAuthenticated(true);
+      }
+    };
+    init();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Simulate login - in real app, validate against backend
     if (email && password.length >= 4) {
-      const userData = storage.getUser();
+      const userData = await storage.getUser();
       userData.email = email;
-      storage.setUser(userData);
+      await storage.setUser(userData);
       storage.setLoggedIn(true);
       setUser(userData);
       setIsAuthenticated(true);
@@ -44,8 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
-  const updateUser = (updatedUser: User) => {
-    storage.setUser(updatedUser);
+  const updateUser = async (updatedUser: User) => {
+    await storage.setUser(updatedUser);
     setUser(updatedUser);
   };
 

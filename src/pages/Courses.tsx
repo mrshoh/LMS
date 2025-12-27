@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
 import { CourseCard } from '@/components/dashboard/CourseCard';
-import { storage } from '@/lib/storage';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 const Courses = () => {
-  const courses = storage.getCourses();
+  const courses = useLiveQuery(() => db.courses.toArray()) || [];
 
   return (
     <div className="space-y-8">

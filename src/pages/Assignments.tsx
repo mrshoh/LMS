@@ -5,58 +5,57 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { storage } from '@/lib/storage';
 import { Assignment } from '@/types/lms';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
+import { storage } from '@/lib/storage';
 
 const statusConfig = {
-  pending: { 
-    icon: Clock, 
-    label: 'Pending', 
-    color: 'bg-warning/10 text-warning border-warning/20' 
+  pending: {
+    icon: Clock,
+    label: 'Pending',
+    color: 'bg-warning/10 text-warning border-warning/20'
   },
-  submitted: { 
-    icon: Send, 
-    label: 'Submitted', 
-    color: 'bg-primary/10 text-primary border-primary/20' 
+  submitted: {
+    icon: Send,
+    label: 'Submitted',
+    color: 'bg-primary/10 text-primary border-primary/20'
   },
-  reviewed: { 
-    icon: AlertCircle, 
-    label: 'Reviewed', 
-    color: 'bg-backend/10 text-backend border-backend/20' 
+  reviewed: {
+    icon: AlertCircle,
+    label: 'Reviewed',
+    color: 'bg-backend/10 text-backend border-backend/20'
   },
-  approved: { 
-    icon: CheckCircle2, 
-    label: 'Approved', 
-    color: 'bg-success/10 text-success border-success/20' 
+  approved: {
+    icon: CheckCircle2,
+    label: 'Approved',
+    color: 'bg-success/10 text-success border-success/20'
   },
-  rejected: { 
-    icon: XCircle, 
-    label: 'Needs Revision', 
-    color: 'bg-destructive/10 text-destructive border-destructive/20' 
+  rejected: {
+    icon: XCircle,
+    label: 'Needs Revision',
+    color: 'bg-destructive/10 text-destructive border-destructive/20'
   },
 };
 
 const Assignments = () => {
-  const [assignments, setAssignments] = useState<Assignment[]>(storage.getAssignments());
+  const assignments = useLiveQuery(() => db.assignments.toArray()) || [];
   const [submissionUrls, setSubmissionUrls] = useState<Record<string, string>>({});
 
-  const handleSubmit = (assignmentId: string) => {
+  const handleSubmit = async (assignmentId: string) => {
     const url = submissionUrls[assignmentId];
     if (!url) {
       toast.error('Please enter a submission URL');
       return;
     }
 
-    const updatedAssignments = assignments.map(a => 
-      a.id === assignmentId 
-        ? { ...a, status: 'submitted' as const, submission: url }
-        : a
-    );
-    
-    setAssignments(updatedAssignments);
-    storage.setAssignments(updatedAssignments);
+    await db.assignments.update(assignmentId, {
+      status: 'submitted',
+      submission: url
+    });
+
     setSubmissionUrls(prev => ({ ...prev, [assignmentId]: '' }));
     toast.success('Assignment submitted successfully!');
   };
@@ -124,13 +123,13 @@ const Assignments = () => {
                         Due: {new Date(assignment.dueDate).toLocaleDateString()}
                       </span>
                     </div>
-                    
+
                     <h3 className="text-lg font-semibold text-foreground">{assignment.title}</h3>
                     <p className="text-muted-foreground mt-1">{assignment.description}</p>
 
                     {/* Submission URL */}
                     {assignment.submission && (
-                      <a 
+                      <a
                         href={assignment.submission}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -168,8 +167,8 @@ const Assignments = () => {
                           [assignment.id]: e.target.value
                         }))}
                       />
-                      <Button 
-                        className="w-full" 
+                      <Button
+                        className="w-full"
                         onClick={() => handleSubmit(assignment.id)}
                       >
                         <Send className="h-4 w-4" />

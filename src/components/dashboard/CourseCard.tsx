@@ -16,6 +16,7 @@ const categoryIcons: Record<string, string> = {
   backend: '⚙️',
   design: '✨',
   data: '📊',
+  mobile: '📱',
 };
 
 export const CourseCard = ({ course, index }: CourseCardProps) => {
@@ -27,7 +28,7 @@ export const CourseCard = ({ course, index }: CourseCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.1 }}
     >
-      <Card 
+      <Card
         className="group relative overflow-hidden border border-border/50 bg-card hover:border-primary/30 hover:shadow-lg transition-all duration-300 cursor-pointer"
         onClick={() => navigate(`/courses/${course.id}`)}
       >
@@ -38,6 +39,7 @@ export const CourseCard = ({ course, index }: CourseCardProps) => {
           course.category === 'backend' && "bg-backend",
           course.category === 'design' && "bg-design",
           course.category === 'data' && "bg-data",
+          course.category === 'mobile' && "bg-primary",
         )} />
 
         <div className="p-5 pl-6">
@@ -69,12 +71,13 @@ export const CourseCard = ({ course, index }: CourseCardProps) => {
                 course.category === 'backend' && "text-backend",
                 course.category === 'design' && "text-design",
                 course.category === 'data' && "text-data",
+                course.category === 'mobile' && "text-primary",
               )}>
                 {course.progress}%
               </span>
             </div>
-            <Progress 
-              value={course.progress} 
+            <Progress
+              value={course.progress}
               variant={course.category}
               className="h-2"
             />

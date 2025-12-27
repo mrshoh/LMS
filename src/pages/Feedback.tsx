@@ -1,21 +1,16 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Check, User } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { storage } from '@/lib/storage';
-import { MentorMessage } from '@/types/lms';
 import { cn } from '@/lib/utils';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 const Feedback = () => {
-  const [messages, setMessages] = useState<MentorMessage[]>(storage.getMessages());
+  const messages = useLiveQuery(() => db.messages.orderBy('date').reverse().toArray()) || [];
 
-  const markAsRead = (messageId: string) => {
-    const updatedMessages = messages.map(m =>
-      m.id === messageId ? { ...m, read: true } : m
-    );
-    setMessages(updatedMessages);
-    storage.setMessages(updatedMessages);
+  const markAsRead = async (messageId: string) => {
+    await db.messages.update(messageId, { read: true });
   };
 
   const unreadCount = messages.filter(m => !m.read).length;
@@ -55,11 +50,11 @@ const Feedback = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card 
+              <Card
                 className={cn(
                   "p-6 border transition-all",
-                  message.read 
-                    ? "border-border/50" 
+                  message.read
+                    ? "border-border/50"
                     : "border-primary/30 bg-primary/5 shadow-md"
                 )}
               >
@@ -92,7 +87,7 @@ const Feedback = () => {
                         <div className="h-3 w-3 rounded-full bg-primary animate-pulse flex-shrink-0" />
                       )}
                     </div>
-                    
+
                     <p className="mt-3 text-foreground leading-relaxed">{message.message}</p>
 
                     {!message.read && (

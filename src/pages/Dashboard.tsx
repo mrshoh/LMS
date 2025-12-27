@@ -2,10 +2,12 @@ import { motion } from 'framer-motion';
 import { DailyFocus } from '@/components/dashboard/DailyFocus';
 import { CourseCard } from '@/components/dashboard/CourseCard';
 import { QuickStats } from '@/components/dashboard/QuickStats';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 import { storage } from '@/lib/storage';
 
 const Dashboard = () => {
-  const courses = storage.getCourses();
+  const courses = useLiveQuery(() => db.courses.toArray()) || [];
 
   return (
     <div className="space-y-8">
